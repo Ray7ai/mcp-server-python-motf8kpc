@@ -4,16 +4,44 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
+from fastapi.responses import JSONResponse
 
 mcp = FastMCP("163-email-connector")
 
-# 简单 Token 验证（推荐）
-EXPECTED_TOKEN = os.getenv("MCP_AUTH_TOKEN", "RAfIEHkFsIHLRE944lVIGnpIS9npMZ1Sgz1YpnvR+G4=")
+# ================== 关键：OAuth Protected Resource Metadata ==================
+@mcp.app.get("/.well-known/oauth-protected-resource")
+async def protected_resource():
+    return JSONResponse({
+        "resource": "https://my-mcp-server-6fay.onrender.com/mcp",
+        "authorization_servers": ["https://my-mcp-server-6fay.onrender.com"],
+        "scopes_supported": ["send_email"],
+        "bearer_methods_supported": ["header"]
+    })
+
+@mcp.app.get("/.well-known/oauth-authorization-server")
+async def authorization_server():
+    return JSONResponse({
+        "issuer": "https://my-mcp-server-6fay.onrender.com",
+        "authorization_endpoint": f"https://my-mcp-server-6fay.onrender.com/oauth/authorize",
+        "token_endpoint": f"https://my-mcp-server-6fay.onrender.com/oauth/token",
+        "response_types_supported": ["code", "token"],
+        "grant_types_supported": ["client_credentials", "authorization_code"],
+        "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"]
+    })
+
+# ================== Token 验证（放宽一点） ==================
+MCP_TOKEN = os.getenv("MCP_AUTH_TOKEN")
 
 @mcp.auth
-def verify_token(token: str) -> bool:
-    return token == EXPECTED_TOKEN or token == f"Bearer {EXPECTED_TOKEN}"
+def verify_auth(token: str = None) -> bool:
+    if not MCP_TOKEN:
+        return True  # 测试阶段临时关闭严格验证
+    if not token:
+        return False
+    clean = token.replace("Bearer ", "").strip()
+    return clean == MCP_TOKEN
 
+# ================== 163 发邮件工具 ==================
 @tool
 def send_163_email(to: str, subject: str, body: str) -> str:
     """通过163邮箱发送邮件（Grok每日提醒专用）"""
@@ -21,7 +49,7 @@ def send_163_email(to: str, subject: str, body: str) -> str:
     auth_code = os.getenv("EMAIL_AUTH_CODE")
 
     if not sender or not auth_code:
-        return "❌ 环境变量未设置"
+        return "❌ 163环境变量未设置"
 
     msg = MIMEMultipart()
     msg['From'] = sender
