@@ -8,34 +8,36 @@ from fastapi.responses import JSONResponse
 
 mcp = FastMCP("163-email-connector")
 
-# ================== 关键：OAuth Protected Resource Metadata ==================
+# ================== 关键 OAuth Metadata（必须返回这些） ==================
 @mcp.app.get("/.well-known/oauth-protected-resource")
 async def protected_resource():
     return JSONResponse({
-        "resource": "https://my-mcp-server-6fay.onrender.com/mcp",
-        "authorization_servers": ["https://my-mcp-server-6fay.onrender.com"],
+        "resource": "https://my-mcp-server-6fay.onrender.onrender.com/mcp",
+        "authorization_servers": ["https://my-mcp-server-6fay.onrender.onrender.com"],
         "scopes_supported": ["send_email"],
         "bearer_methods_supported": ["header"]
     })
 
 @mcp.app.get("/.well-known/oauth-authorization-server")
 async def authorization_server():
+    base = "https://my-mcp-server-6fay.onrender.onrender.com"
     return JSONResponse({
-        "issuer": "https://my-mcp-server-6fay.onrender.com",
-        "authorization_endpoint": f"https://my-mcp-server-6fay.onrender.com/oauth/authorize",
-        "token_endpoint": f"https://my-mcp-server-6fay.onrender.com/oauth/token",
+        "issuer": base,
+        "authorization_endpoint": f"{base}/oauth/authorize",
+        "token_endpoint": f"{base}/oauth/token",
         "response_types_supported": ["code", "token"],
         "grant_types_supported": ["client_credentials", "authorization_code"],
-        "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"]
+        "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
+        "scopes_supported": ["send_email"]
     })
 
-# ================== Token 验证（放宽一点） ==================
-MCP_TOKEN = os.getenv("MCP_AUTH_TOKEN")
+# ================== Token 验证（临时宽松） ==================
+MCP_TOKEN = os.getenv("MCP_AUTH_TOKEN", "default-token-please-change")
 
 @mcp.auth
 def verify_auth(token: str = None) -> bool:
-    if not MCP_TOKEN:
-        return True  # 测试阶段临时关闭严格验证
+    if MCP_TOKEN == "default-token-please-change":
+        return True  # 测试时临时放行
     if not token:
         return False
     clean = token.replace("Bearer ", "").strip()
@@ -49,7 +51,7 @@ def send_163_email(to: str, subject: str, body: str) -> str:
     auth_code = os.getenv("EMAIL_AUTH_CODE")
 
     if not sender or not auth_code:
-        return "❌ 163环境变量未设置"
+        return "❌ 163环境变量未设置，请检查 Render Environment"
 
     msg = MIMEMultipart()
     msg['From'] = sender
@@ -68,5 +70,5 @@ def send_163_email(to: str, subject: str, body: str) -> str:
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 8000))
     uvicorn.run(mcp.app, host="0.0.0.0", port=port)
