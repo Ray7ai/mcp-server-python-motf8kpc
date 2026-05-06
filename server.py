@@ -5,8 +5,14 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
 
-# 创建 MCP Server
 mcp = FastMCP("163-email-connector")
+
+# 简单 Token 验证（推荐）
+EXPECTED_TOKEN = os.getenv("MCP_AUTH_TOKEN", "your-secret-token-123")
+
+@mcp.auth
+def verify_token(token: str) -> bool:
+    return token == EXPECTED_TOKEN or token == f"Bearer {EXPECTED_TOKEN}"
 
 @tool
 def send_163_email(to: str, subject: str, body: str) -> str:
@@ -15,7 +21,7 @@ def send_163_email(to: str, subject: str, body: str) -> str:
     auth_code = os.getenv("EMAIL_AUTH_CODE")
 
     if not sender or not auth_code:
-        return "❌ 环境变量 EMAIL_USER 或 EMAIL_AUTH_CODE 未设置"
+        return "❌ 环境变量未设置"
 
     msg = MIMEMultipart()
     msg['From'] = sender
