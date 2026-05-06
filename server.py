@@ -8,7 +8,7 @@ import os
 mcp = FastMCP("163-email-connector")
 
 # 简单 Token 验证（推荐）
-EXPECTED_TOKEN = os.getenv("MCP_AUTH_TOKEN", "your-secret-token-123")
+EXPECTED_TOKEN = os.getenv("MCP_AUTH_TOKEN", "RAfIEHkFsIHLRE944lVIGnpIS9npMZ1Sgz1YpnvR+G4=")
 
 @mcp.auth
 def verify_token(token: str) -> bool:
